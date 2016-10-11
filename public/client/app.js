@@ -33,16 +33,6 @@ window.Shortly = Backbone.View.extend({
     this.router.navigate('/create', { trigger: true });
   },
 
-  // renderLoginView: function(e) {
-  //   e && e.preventDefault();
-  //   this.router.navigate('/login', { trigger: true });
-  // },
-
-  // renderSignupView: function(e) {
-  //   e && e.preventDefault();
-  //   this.router.navigate('/signup', { trigger: true });
-  // },
-
   updateNav: function(routeName) {
     this.$el.find('.navigation li a')
       .removeClass('selected')

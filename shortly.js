@@ -3,6 +3,7 @@ var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
 var session = require('express-session');
+var bcrypt = require('bcrypt');
 
 
 var db = require('./app/config');
@@ -24,7 +25,7 @@ app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
 // AUTHENTICATION ---------------------------------------
-app.use(session({ secret: 'keyboard cat', cookie: { maxAge: 60000 }})); // use sessions
+app.use(session({ secret: 'keyboard cat', cookie: { maxAge: 15000 }})); // use sessions
 
 var restrict = function(req, res, next) {
   if (req.session.user) {
@@ -48,7 +49,7 @@ app.get('/links', restrict, function(req, res) {
   });
 });
 
-app.post('/links', 
+app.post('/links',
 function(req, res) {
   var uri = req.body.url;
 
@@ -88,10 +89,31 @@ app.get('/login', function(req, res) {
   res.render('login');
 });
 
+app.post('/login', function(req, res) {
+ 
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({ username: username}).fetch().then(function(user) {
+    var salt = user.get('salt');
+    var hash = user.get('hash');
+    var newHash = bcrypt.hashSync(password, salt);
+    if (hash === newHash) {
+      // generate session 
+      req.session.regenerate(function() {
+        req.session.user = username;
+        res.redirect('/');
+      });
+    } else {
+      res.redirect('/login');
+    }
+  });
+});
+
+
 app.get('/signup', function(req, res) {
   res.render('signup');
 });
-
 
 app.post('/signup', function(req, res) {
   // console.log(req);
@@ -103,9 +125,13 @@ app.post('/signup', function(req, res) {
     if (alreadyExists) {
       res.redirect('/signup');
     } else {
+      var salt = bcrypt.genSaltSync(10);
+      var hash = bcrypt.hashSync(password, salt);
+
       Users.create({
         username: username,
-        password: password
+        hash: hash,
+        salt: salt
       }).then(function() { // test might want autologin
         req.session.regenerate(function() {
           req.session.user = username;
@@ -117,23 +143,6 @@ app.post('/signup', function(req, res) {
 });
 
 
-app.post('/login', function(req, res) {
- 
-  var username = req.body.username;
-  var password = req.body.password;
-
-  new User({ username: username, password: password }).fetch().then(function(matches) {
-    if (matches) {
-      // generate session 
-      req.session.regenerate(function() {
-        req.session.user = username;
-        res.redirect('/');
-      });
-    } else {
-      res.redirect('/login');
-    }
-  });
-});
 
 
 app.get('/logout', function(req, res) {
@@ -149,7 +158,7 @@ app.get('/logout', function(req, res) {
 // If the short-code doesn't exist, send the user to '/'
 /************************************************************/
 
-app.get('/*', function(req, res) {
+app.get('/*', restrict, function(req, res) {
   new Link({ code: req.params[0] }).fetch().then(function(link) {
     if (!link) {
       res.redirect('/');
