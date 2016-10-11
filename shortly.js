@@ -92,32 +92,56 @@ app.get('/signup', function(req, res) {
   res.render('signup');
 });
 
+
 app.post('/signup', function(req, res) {
   // console.log(req);
   var data = req.body;
   var username = data.username;
   var password = data.password;
 
-  new User({ username: username, password: password }).fetch().then(function(alreadyCreated) {
-    if (alreadyCreated) {
-      res.redirect('/login');
+  new User({ username: username }).fetch().then(function(alreadyExists) {
+    if (alreadyExists) {
+      res.redirect('/signup');
     } else {
       Users.create({
         username: username,
         password: password
-      }).then(function() {
-        res.redirect('/login');
+      }).then(function() { // test might want autologin
+        req.session.regenerate(function() {
+          req.session.user = username;
+          res.redirect('/');
+        });
       });
     }
   });
 });
 
-      // if(userObj){
-      //   request.session.regenerate(function(){
-      //       request.session.user = userObj.username;
-      //       response.redirect('/restricted');
-      //   });
-      // }
+
+app.post('/login', function(req, res) {
+ 
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({ username: username, password: password }).fetch().then(function(matches) {
+    if (matches) {
+      // generate session 
+      req.session.regenerate(function() {
+        req.session.user = username;
+        res.redirect('/');
+      });
+    } else {
+      res.redirect('/login');
+    }
+  });
+});
+
+
+app.get('/logout', function(req, res) {
+  req.session.destroy(function() {
+    res.redirect('/login');
+  });
+});
+
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
