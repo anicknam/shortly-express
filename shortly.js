@@ -2,6 +2,7 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var session = require('express-session');
 
 
 var db = require('./app/config');
@@ -22,19 +23,26 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
+// AUTHENTICATION ---------------------------------------
+app.use(session({ secret: 'keyboard cat', cookie: { maxAge: 60000 }})); // use sessions
 
-app.get('/', 
-function(req, res) {
+var restrict = function(req, res, next) {
+  if (req.session.user) {
+    next();
+  } else {
+    res.redirect(301, '/login');
+  }
+};
+
+app.get('/', restrict, function(req, res) {
   res.render('index');
 });
 
-app.get('/create', 
-function(req, res) {
+app.get('/create', restrict, function(req, res) {
   res.render('index');
 });
 
-app.get('/links', 
-function(req, res) {
+app.get('/links', restrict, function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.status(200).send(links.models);
   });
@@ -76,7 +84,40 @@ function(req, res) {
 // Write your authentication routes here
 /************************************************************/
 
+app.get('/login', function(req, res) {
+  res.render('login');
+});
 
+app.get('/signup', function(req, res) {
+  res.render('signup');
+});
+
+app.post('/signup', function(req, res) {
+  // console.log(req);
+  var data = req.body;
+  var username = data.username;
+  var password = data.password;
+
+  new User({ username: username, password: password }).fetch().then(function(alreadyCreated) {
+    if (alreadyCreated) {
+      res.redirect('/login');
+    } else {
+      Users.create({
+        username: username,
+        password: password
+      }).then(function() {
+        res.redirect('/login');
+      });
+    }
+  });
+});
+
+      // if(userObj){
+      //   request.session.regenerate(function(){
+      //       request.session.user = userObj.username;
+      //       response.redirect('/restricted');
+      //   });
+      // }
 
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
@@ -104,4 +145,4 @@ app.get('/*', function(req, res) {
 });
 
 console.log('Shortly is listening on 4568');
-app.listen(4568);
+app.listen(4568); // 4568
